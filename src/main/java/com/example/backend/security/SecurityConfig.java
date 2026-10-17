@@ -16,11 +16,13 @@ import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.security.oauth2.server.resource.web.BearerTokenResolver;
 import org.springframework.security.oauth2.jose.jws.MacAlgorithm;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.security.oauth2.jwt.JwtEncoder;
 import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
 import org.springframework.security.oauth2.jwt.NimbusJwtEncoder;
+import org.springframework.security.oauth2.server.resource.web.authentication.BearerTokenAuthenticationFilter;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
@@ -30,22 +32,24 @@ import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 public class SecurityConfig {
 
 	@Bean
-	SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
+	SecurityFilterChain securityFilterChain(HttpSecurity http, OriginValidationFilter originValidationFilter,
+			BearerTokenResolver cookieBearerTokenResolver) throws Exception {
 		return http
 			.csrf(csrf -> csrf.disable())
 			.cors(Customizer.withDefaults())
 			.sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
 			.authorizeHttpRequests(authorize -> authorize
-				.requestMatchers("/api/auth/**", "/api/stocks", "/api/stocks/**", "/api/health").permitAll()
+				.requestMatchers("/api/auth/register", "/api/auth/login", "/api/auth/logout", "/api/health").permitAll()
 				.requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
 				.anyRequest().authenticated())
 			.oauth2ResourceServer(resourceServer -> resourceServer
+				.bearerTokenResolver(cookieBearerTokenResolver)
 				.jwt(Customizer.withDefaults())
 				.authenticationEntryPoint((request, response, exception) -> {
 					response.setStatus(401);
 					response.setContentType(MediaType.APPLICATION_JSON_VALUE);
 					response.getWriter().write(
-						"{\"status\":401,\"error\":\"Unauthorized\",\"message\":\"A valid bearer token is required.\"}"
+						"{\"status\":401,\"error\":\"Unauthorized\",\"message\":\"Sign in to access this resource.\"}"
 					);
 				}))
 			.exceptionHandling(errors -> errors.accessDeniedHandler((request, response, exception) -> {
@@ -55,6 +59,7 @@ public class SecurityConfig {
 					"{\"status\":403,\"error\":\"Forbidden\",\"message\":\"You are not allowed to perform this request.\"}"
 				);
 			}))
+			.addFilterBefore(originValidationFilter, BearerTokenAuthenticationFilter.class)
 			.build();
 	}
 
@@ -72,12 +77,35 @@ public class SecurityConfig {
 		CorsConfiguration configuration = new CorsConfiguration();
 		configuration.setAllowedOrigins(origins);
 		configuration.setAllowedMethods(List.of("GET", "POST", "OPTIONS"));
-		configuration.setAllowedHeaders(List.of("Authorization", "Content-Type"));
-		configuration.setAllowCredentials(false);
+		configuration.setAllowedHeaders(List.of("Content-Type"));
+		configuration.setAllowCredentials(true);
 
 		UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
 		source.registerCorsConfiguration("/**", configuration);
 		return source;
+	}
+
+	@Bean
+	BearerTokenResolver cookieBearerTokenResolver() {
+		return request -> {
+			if (request.getCookies() == null) {
+				return null;
+			}
+			return Arrays.stream(request.getCookies())
+				.filter(cookie -> SessionCookie.NAME.equals(cookie.getName()))
+				.map(jakarta.servlet.http.Cookie::getValue)
+				.findFirst()
+				.orElse(null);
+		};
+	}
+
+	@Bean
+	OriginValidationFilter originValidationFilter(@Value("${app.cors.allowed-origins}") String allowedOrigins) {
+		List<String> origins = Arrays.stream(allowedOrigins.split(","))
+			.map(String::trim)
+			.filter(origin -> !origin.isEmpty())
+			.toList();
+		return new OriginValidationFilter(origins);
 	}
 
 	@Bean

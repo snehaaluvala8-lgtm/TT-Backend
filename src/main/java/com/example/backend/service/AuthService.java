@@ -1,10 +1,10 @@
 package com.example.backend.service;
 
-import com.example.backend.dto.ApiDtos.AuthResponse;
 import com.example.backend.dto.ApiDtos.LoginRequest;
 import com.example.backend.dto.ApiDtos.RegisterRequest;
 import com.example.backend.model.AppUser;
 import com.example.backend.repository.AppUserRepository;
+import com.example.backend.security.JwtTokenService.IssuedToken;
 import com.example.backend.security.JwtTokenService;
 import java.math.BigDecimal;
 import java.util.Locale;
@@ -31,7 +31,7 @@ public class AuthService {
 	}
 
 	@Transactional
-	public AuthResponse register(RegisterRequest request) {
+	public IssuedToken register(RegisterRequest request) {
 		String username = request.username().trim();
 		String email = request.email().trim().toLowerCase(Locale.ROOT);
 		if (userRepository.existsByUsernameIgnoreCase(username)) {
@@ -47,7 +47,7 @@ public class AuthService {
 	}
 
 	@Transactional(readOnly = true)
-	public AuthResponse login(LoginRequest request) {
+	public IssuedToken login(LoginRequest request) {
 		String identifier = request.identifier().trim();
 		AppUser user = userRepository.findByUsernameIgnoreCaseOrEmailIgnoreCase(identifier, identifier)
 			.orElseThrow(this::invalidCredentials);

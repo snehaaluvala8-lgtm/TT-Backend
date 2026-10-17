@@ -28,7 +28,7 @@ public final class ApiDtos {
 	) {
 	}
 
-	public record AuthResponse(String accessToken, String tokenType, long expiresInSeconds, String username) {
+	public record AuthResponse(String username) {
 	}
 
 	public record StockResponse(String symbol, String companyName, BigDecimal currentPrice, String priceType) {

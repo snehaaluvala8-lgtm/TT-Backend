@@ -1,6 +1,5 @@
 package com.example.backend.security;
 
-import com.example.backend.dto.ApiDtos.AuthResponse;
 import java.time.Duration;
 import java.time.Instant;
 import org.springframework.security.oauth2.jose.jws.MacAlgorithm;
@@ -21,7 +20,7 @@ public class JwtTokenService {
 		this.jwtEncoder = jwtEncoder;
 	}
 
-	public AuthResponse issueToken(String username) {
+	public IssuedToken issueToken(String username) {
 		Instant issuedAt = Instant.now();
 		Instant expiresAt = issuedAt.plus(TOKEN_LIFETIME);
 		JwtClaimsSet claims = JwtClaimsSet.builder()
@@ -31,6 +30,9 @@ public class JwtTokenService {
 			.build();
 		JwsHeader header = JwsHeader.with(MacAlgorithm.HS256).build();
 		String token = jwtEncoder.encode(JwtEncoderParameters.from(header, claims)).getTokenValue();
-		return new AuthResponse(token, "Bearer", TOKEN_LIFETIME.toSeconds(), username);
+		return new IssuedToken(token, TOKEN_LIFETIME.toSeconds(), username);
+	}
+
+	public record IssuedToken(String value, long expiresInSeconds, String username) {
 	}
 }
